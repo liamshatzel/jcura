@@ -6,13 +6,6 @@ __pycache__/
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
 
-# don't track datasets (except sample)
-datasets/*
-!datasets/WaterDropSample/
-
-# output dirs
-output/
-wandb/
-experiments/*.e*
-experiments/*.o*
 env
+
+*.DS_Store
