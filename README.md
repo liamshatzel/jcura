@@ -1,2 +1,2 @@
-# jcura
-JCURA 2025
+# JCURA
+JCURA 2024-2025
