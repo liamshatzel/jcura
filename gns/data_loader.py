@@ -17,6 +17,9 @@ def load_npz_data(path):
     with np.load(path, allow_pickle=True) as data_file:
         if 'gns_data' in data_file:
             data = data_file['gns_data']
+        elif "trajectories" in data_file:
+            data = data_file["trajectories"].item()
+            data = [value for value in data.values()]
         else:
             data = [item for _, item in data_file.items()]
     return data
@@ -50,6 +53,7 @@ class SamplesDataset(torch.utils.data.Dataset):
         # convert to list of tuples
         # TODO: allow_pickle=True is potential security risk. See docs.
         self._data = load_npz_data(path)
+        print(self._data[0][0])
         
         # length of each trajectory in the dataset
         # excluding the input_length_sequence
