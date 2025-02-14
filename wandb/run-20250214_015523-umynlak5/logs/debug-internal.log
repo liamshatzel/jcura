@@ -1,0 +1,16 @@
+{"time":"2025-02-14T01:55:23.082335-08:00","level":"INFO","msg":"using version","core version":"0.19.1"}
+{"time":"2025-02-14T01:55:23.082371-08:00","level":"INFO","msg":"created symlink","path":"/Users/liamshatzel/code/jcura/wandb/run-20250214_015523-umynlak5/logs/debug-core.log"}
+{"time":"2025-02-14T01:55:23.192901-08:00","level":"INFO","msg":"created new stream","id":"umynlak5"}
+{"time":"2025-02-14T01:55:23.192941-08:00","level":"INFO","msg":"stream: started","id":"umynlak5"}
+{"time":"2025-02-14T01:55:23.193163-08:00","level":"INFO","msg":"handler: started","stream_id":"umynlak5"}
+{"time":"2025-02-14T01:55:23.193199-08:00","level":"INFO","msg":"writer: Do: started","stream_id":"umynlak5"}
+{"time":"2025-02-14T01:55:23.193202-08:00","level":"INFO","msg":"sender: started","stream_id":"umynlak5"}
+{"time":"2025-02-14T01:55:23.46869-08:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-02-14T01:55:24.297028-08:00","level":"INFO","msg":"stream: closing","id":"umynlak5"}
+{"time":"2025-02-14T01:55:24.29707-08:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-02-14T01:55:24.29746-08:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-02-14T01:55:24.707279-08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-02-14T01:55:24.897568-08:00","level":"INFO","msg":"handler: closed","stream_id":"umynlak5"}
+{"time":"2025-02-14T01:55:24.897811-08:00","level":"INFO","msg":"writer: Close: closed","stream_id":"umynlak5"}
+{"time":"2025-02-14T01:55:24.899258-08:00","level":"INFO","msg":"sender: closed","stream_id":"umynlak5"}
+{"time":"2025-02-14T01:55:24.899333-08:00","level":"INFO","msg":"stream: closed","id":"umynlak5"}

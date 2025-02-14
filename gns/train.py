@@ -21,6 +21,10 @@ from gns import reading_utils
 from gns import data_loader
 from gns import distribute
 
+import wandb
+
+wandb.login()
+
 flags.DEFINE_enum(
     'mode', 'train', ['train', 'valid', 'rollout'],
     help='Train model, validation or rollout evaluation.')
@@ -44,6 +48,7 @@ flags.DEFINE_integer('lr_decay_steps', int(5e6), help='Learning rate decay steps
 
 flags.DEFINE_integer("cuda_device_number", None, help="CUDA device (zero indexed), default is None so default CUDA device will be used.")
 flags.DEFINE_integer("n_gpus", 1, help="The number of GPUs to utilize for training.")
+flags.DEFINE_bool("wandb_sweep", False, help="Run a weights and biases hyperparam sweep.")
 
 FLAGS = flags.FLAGS
 
@@ -291,7 +296,7 @@ def train(rank, flags, world_size, device):
     optimizer = torch.optim.Adam(simulator.parameters(), lr=flags["lr_init"]*world_size)
   else:
     simulator = _get_simulator(metadata, flags["noise_std"], flags["noise_std"], device)
-    optimizer = torch.optim.Adam(simulator.parameters(), lr=flags["lr_init"] * world_size)
+    optimizer = torch.optim.Adam(simulator.parameters(), lr=flags["lr_init"]* world_size)
 
   # Initialize training state
   step = 0
@@ -604,55 +609,87 @@ def validation(
 
 
 def main(_):
-  """Train or evaluates the model.
+    """Train or evaluates the model."""
 
-  """
-  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-  if device == torch.device('cuda'):
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "29500"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device == torch.device("cuda"):
+        os.environ["MASTER_ADDR"] = "localhost"
+        os.environ["MASTER_PORT"] = "29500"
 
-  myflags = reading_utils.flags_to_dict(FLAGS)
+    myflags = reading_utils.flags_to_dict(FLAGS)
 
-  if FLAGS.mode == 'train':
-    # If model_path does not exist create new directory.
-    if not os.path.exists(FLAGS.model_path):
-      os.makedirs(FLAGS.model_path)
-
-    # Train on gpu 
-    if device == torch.device('cuda'):
-      available_gpus = torch.cuda.device_count()
-      print(f"Available GPUs = {available_gpus}")
-
-      # Set the number of GPUs based on availability and the specified number
-      if FLAGS.n_gpus is None or FLAGS.n_gpus > available_gpus:
-        world_size = available_gpus
-        if FLAGS.n_gpus is not None:
-          print(f"Warning: The number of GPUs specified ({FLAGS.n_gpus}) exceeds the available GPUs ({available_gpus})")
-      else:
-        world_size = FLAGS.n_gpus
-
-      # Print the status of GPU usage
-      print(f"Using {world_size}/{available_gpus} GPUs")
-
-      # Spawn training to GPUs
-      distribute.spawn_train(train, myflags, world_size, device)
-
-    # Train on cpu  
+    if FLAGS.wandb_sweep and FLAGS.mode == "train":
+        wandb.agent(sweep_id, function=lambda: train_sweep(FLAGS), count=10)
+        return
     else:
-      rank = None
-      world_size = 1
-      train(rank, myflags, world_size, device)
+        wandb.init(
+            project="crowd-manifold",
+            entity="GAIDG_Lab",
+            config=FLAGS,
+        )   
 
-  elif FLAGS.mode in ['valid', 'rollout']:
-    # Set device
-    world_size = torch.cuda.device_count()
-    if FLAGS.cuda_device_number is not None and torch.cuda.is_available():
-      device = torch.device(f'cuda:{int(FLAGS.cuda_device_number)}')
-    #test code
-    print(f"device is {device} world size is {world_size}")
-    predict(device)
+    if FLAGS.mode == "train":
+        # If model_path does not exist create new directory.
+        if not os.path.exists(FLAGS.model_path):
+            os.makedirs(FLAGS.model_path)
 
+        # Train on gpu
+        if device == torch.device("cuda"):
+            available_gpus = torch.cuda.device_count()
+            print(f"Available GPUs = {available_gpus}")
 
-if __name__ == '__main__':
-  app.run(main)
+            # Set the number of GPUs based on availability and the specified number
+            if FLAGS.n_gpus is None or FLAGS.n_gpus > available_gpus:
+                world_size = available_gpus
+                if FLAGS.n_gpus is not None:
+                    print(
+                        f"Warning: The number of GPUs specified ({FLAGS.n_gpus}) exceeds the available GPUs ({available_gpus})"
+                    )
+            else:
+                world_size = FLAGS.n_gpus
+
+            # Print the status of GPU usage
+            print(f"Using {world_size}/{available_gpus} GPUs")
+
+            # Spawn training to GPUs
+            distribute.spawn_train(train, myflags, world_size, device)
+
+        # Train on cpu
+        else:
+            rank = None
+            world_size = 1
+            train(rank, myflags, world_size, device)
+
+    elif FLAGS.mode in ["valid", "rollout"]:
+        # Set device
+        world_size = torch.cuda.device_count()
+        if FLAGS.cuda_device_number is not None and torch.cuda.is_available():
+            device = torch.device(f"cuda:{int(FLAGS.cuda_device_number)}")
+        # test code
+        print(f"device is {device} world size is {world_size}")
+        predict(device)
+
+sweep_configuration = {
+    "method": "random",
+    "metric": {"goal": "minimize", "name": "train_loss"},
+    "parameters": {
+        "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
+        "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
+    },
+}
+
+sweep_id = wandb.sweep(sweep=sweep_configuration, project="jcura", entity="GAIDG_Lab")
+
+def train_sweep(flags):
+    """Train function for wandb sweep."""
+    myflags = reading_utils.flags_to_dict(flags)
+    with wandb.init() as run:
+
+        # Update flags with wandb config
+        myflags["batch_size"] = wandb.config.batch_size
+        myflags["lr_init"] = wandb.config.lr_init
+        
+        train(None, myflags, world_size=1, device=torch.device("cpu"))  
+
+if __name__ == "__main__":
+    app.run(main)
