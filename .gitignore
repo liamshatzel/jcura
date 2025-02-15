@@ -13,3 +13,5 @@ env
 datasets
 !datasets/WaterDropSample
 models
+
+wandb
