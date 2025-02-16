@@ -205,6 +205,7 @@ def predict(device: str):
 
   print("Mean loss on rollout prediction: {}".format(
       torch.mean(torch.cat(eval_loss))))
+  wandb.log({"Rollout loss: ": torch.mean(torch.cat(eval_loss))})
 
 
 def optimizer_to(optim, device):
@@ -448,6 +449,7 @@ def train(rank, flags, world_size, device):
           param['lr'] = lr_new
      
         print(f'rank = {rank}, epoch = {epoch}, step = {step}/{flags["ntraining_steps"]}, loss = {train_loss}', flush=True)
+        wandb.log({"Training Loss: ": train_loss})
 
         # Save model state
         if rank == 0 or device == torch.device("cpu"):
@@ -483,8 +485,10 @@ def train(rank, flags, world_size, device):
       # Print epoch statistics
       if rank == 0 or device == torch.device("cpu"):
         print(f'Epoch {epoch}, training loss: {epoch_train_loss.item()}')
+        wandb.log({"Epoch Train Loss": epoch_train_loss.item()})
         if flags["validation_interval"] is not None:
           print(f'Epoch {epoch}, validation loss: {epoch_valid_loss.item()}')
+          wandb.log({"Epoch Valid Loss": epoch_valid_loss.item()})
       
       # Reset epoch training loss
       epoch_train_loss = 0
@@ -675,6 +679,7 @@ sweep_configuration = {
     "parameters": {
         "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
         "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
+        'ntraining_steps': {"max": 50, "min": 200}
     },
 }
 
@@ -688,6 +693,7 @@ def train_sweep(flags):
         # Update flags with wandb config
         myflags["batch_size"] = wandb.config.batch_size
         myflags["lr_init"] = wandb.config.lr_init
+        myflags["ntraining_steps"] = wandb.config.ntraining_steps
         
         train(None, myflags, world_size=1, device=torch.device("cpu"))  
 

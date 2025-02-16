@@ -53,7 +53,6 @@ class SamplesDataset(torch.utils.data.Dataset):
         # convert to list of tuples
         # TODO: allow_pickle=True is potential security risk. See docs.
         self._data = load_npz_data(path)
-        print(self._data[0][0])
         
         # length of each trajectory in the dataset
         # excluding the input_length_sequence
