@@ -20,10 +20,19 @@ from gns import noise_utils
 from gns import reading_utils
 from gns import data_loader
 from gns import distribute
+from gns.data_loader import TrajectoriesDataset
+import matplotlib.pyplot as plt
+from matplotlib import animation
 
 import wandb
 
-wandb.login()
+TYPE_TO_COLOR = {
+    3: "black",
+    0: "green",
+    7: "magenta",
+    6: "gold",
+    5: "blue",
+}
 
 flags.DEFINE_enum(
     'mode', 'train', ['train', 'valid', 'rollout'],
@@ -49,6 +58,8 @@ flags.DEFINE_integer('lr_decay_steps', int(5e6), help='Learning rate decay steps
 flags.DEFINE_integer("cuda_device_number", None, help="CUDA device (zero indexed), default is None so default CUDA device will be used.")
 flags.DEFINE_integer("n_gpus", 1, help="The number of GPUs to utilize for training.")
 flags.DEFINE_bool("wandb_sweep", False, help="Run a weights and biases hyperparam sweep.")
+flags.DEFINE_integer("visualization_interval", 1000, help="Visualize a rollout.")
+flags.DEFINE_bool("wandb_enable", False, help="Enable weights and biases.")
 
 FLAGS = flags.FLAGS
 
@@ -57,6 +68,81 @@ Stats = collections.namedtuple('Stats', ['mean', 'std'])
 INPUT_SEQUENCE_LENGTH = 6  # So we can calculate the last 5 velocities.
 NUM_PARTICLE_TYPES = 9
 KINEMATIC_PARTICLE_ID = 3
+
+# Attr: An adapdation of code initially written by @sbobyn 
+def visualize_rollout(
+  simulator: learned_simulator.LearnedSimulator,
+  position: torch.tensor,
+  particle_types: torch.tensor,
+  n_particles_per_example: torch.tensor,
+  nsteps: int,
+  device: torch.device,
+  metadata: dict,
+  output_path: str,
+):
+  output_dict, _ = rollout(
+    simulator,
+    position.to(device),
+    particle_types.to(device),
+    None,
+    n_particles_per_example,
+    nsteps,
+    device
+  )
+  ground_truth_positions = output_dict["ground_truth_rollout"]
+  predicted_positions = output_dict["predicted_rollout"]
+  particle_types = output_dict["particle_types"]
+
+  anim = create_anim(
+    particle_types,
+    predicted_positions, 
+    ground_truth_positions, 
+    metadata
+  )
+
+  anim.save(output_path, writer="ffmpeg", fps=120)
+  if FLAGS.wandb_enable:
+    wandb.log({"rollout_video": wandb.Video(output_path, fps=120)})
+  print(f"Rollout saved at {output_path}")
+
+def create_anim(particle_type, position_pred, position_ground_truth, metadata):
+  fig, axes = plt.subplots(1,2, figsize=(10,5))
+  plot_info = [
+    prep_viz(axes[0], particle_type, position_ground_truth, metadata),
+    prep_viz(axes[1], particle_type, position_pred, metadata),
+  ]
+
+  axes[0].set_title("Ground Truth")
+  axes[1].set_title("Prediction")
+
+  def update(step_i):
+    outputs = []
+    for _, position, points in plot_info:
+      for type_, line in points.items():
+        mask = particle_type == type_
+        line.set_data(position[step_i, mask, 0], position[step_i, mask, 1])
+      outputs.append(line)
+    return outputs
+
+  return animation.FuncAnimation(
+    fig, 
+    update,
+    frames=np.arange(0, position_ground_truth.shape[0]), 
+    interval=10
+  )
+
+def prep_viz(ax, particle_type, position, metadata):
+  bounds = metadata["bounds"]
+  ax.set_xlim(bounds[0][0], bounds[0][1])
+  ax.set_ylim(bounds[1][0], bounds[1][1])
+  ax.set_xticks([])
+  ax.set_yticks([])
+  ax.set_aspect(1.0)
+  points = {
+    type_: ax.plot([], [], "o", ms=2, color=color)[0]
+    for type_, color in TYPE_TO_COLOR.items()
+  }
+  return ax, position, points
 
 def rollout(
         simulator: learned_simulator.LearnedSimulator,
@@ -205,7 +291,8 @@ def predict(device: str):
 
   print("Mean loss on rollout prediction: {}".format(
       torch.mean(torch.cat(eval_loss))))
-  wandb.log({"Rollout loss: ": torch.mean(torch.cat(eval_loss))})
+  if flags["wandb_enable"]:
+    wandb.log({"Rollout loss: ": torch.mean(torch.cat(eval_loss))})
 
 
 def optimizer_to(optim, device):
@@ -371,6 +458,10 @@ def train(rank, flags, world_size, device):
   )
   n_features = len(dl.dataset._data[0])
 
+  rollout_dataset = TrajectoriesDataset(
+    f"{flags['data_path']}valid.npz"
+    )
+
   # Load validation data
   if flags["validation_interval"] is not None:
       dl_valid = get_data_loader(
@@ -432,6 +523,30 @@ def train(rank, flags, world_size, device):
                 simulator, sampled_valid_example, n_features, flags, rank, device_id)
               print(f"Validation loss at {step}: {valid_loss.item()}")
 
+        # Visualization
+        if flags["visualization_interval"] is not None:
+          if step > 0 and step % flags["visualization_interval"] == 0:
+            simulator.eval()
+            video_path = os.path.join(flags["output_path"], f"rollout_{step}.mp4")
+            if not os.path.exists(flags["output_path"]):
+              os.makedirs(flags["output_path"])
+
+            rollout_ex = rollout_dataset[0]
+            with torch.no_grad():
+              roll_0 = rollout_ex[0]
+              roll_1 = rollout_ex[1]
+              visualize_rollout(
+                simulator, 
+                roll_0.to(device_id), 
+                roll_1.to(device_id),
+                roll_0.shape[0],
+                roll_0.shape[1] - INPUT_SEQUENCE_LENGTH,
+                device,
+                metadata,
+                video_path,
+                )
+              
+            
         # Calculate the loss and mask out loss on kinematic particles
         loss = acceleration_loss(pred_acc, target_acc, non_kinematic_mask)
 
@@ -449,7 +564,8 @@ def train(rank, flags, world_size, device):
           param['lr'] = lr_new
      
         print(f'rank = {rank}, epoch = {epoch}, step = {step}/{flags["ntraining_steps"]}, loss = {train_loss}', flush=True)
-        wandb.log({"Training Loss: ": train_loss})
+        if flags["wandb_enable"]:
+          wandb.log({"Training Loss: ": train_loss})
 
         # Save model state
         if rank == 0 or device == torch.device("cpu"):
@@ -485,10 +601,12 @@ def train(rank, flags, world_size, device):
       # Print epoch statistics
       if rank == 0 or device == torch.device("cpu"):
         print(f'Epoch {epoch}, training loss: {epoch_train_loss.item()}')
-        wandb.log({"Epoch Train Loss": epoch_train_loss.item()})
+        if flags["wandb_enable"]:
+          wandb.log({"Epoch Train Loss": epoch_train_loss.item()})
         if flags["validation_interval"] is not None:
           print(f'Epoch {epoch}, validation loss: {epoch_valid_loss.item()}')
-          wandb.log({"Epoch Valid Loss": epoch_valid_loss.item()})
+          if flags["wandb_enable"]:
+            wandb.log({"Epoch Valid Loss": epoch_valid_loss.item()})
       
       # Reset epoch training loss
       epoch_train_loss = 0
@@ -615,6 +733,9 @@ def validation(
 def main(_):
     """Train or evaluates the model."""
 
+    if FLAGS.wandb_enable:
+      wandb.login()
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device == torch.device("cuda"):
         os.environ["MASTER_ADDR"] = "localhost"
@@ -625,7 +746,7 @@ def main(_):
     if FLAGS.wandb_sweep and FLAGS.mode == "train":
         wandb.agent(sweep_id, function=lambda: train_sweep(FLAGS), count=10)
         return
-    else:
+    elif FLAGS.wandb_enable:
         wandb.init(
             project="crowd-manifold",
             entity="GAIDG_Lab",
@@ -673,19 +794,20 @@ def main(_):
         print(f"device is {device} world size is {world_size}")
         predict(device)
 
-sweep_configuration = {
-    "method": "random",
-    "metric": {"goal": "minimize", "name": "train_loss"},
-    "parameters": {
-        "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
-        "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
-        'ntraining_steps': {"max": 50, "min": 200}
-    },
-}
-
-sweep_id = wandb.sweep(sweep=sweep_configuration, project="jcura", entity="GAIDG_Lab")
 
 def train_sweep(flags):
+
+    sweep_configuration = {
+        "method": "random",
+        "metric": {"goal": "minimize", "name": "train_loss"},
+        "parameters": {
+            "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
+            "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
+            'ntraining_steps': {"max": 50, "min": 200}
+        },
+    }
+
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="jcura", entity="GAIDG_Lab")
     """Train function for wandb sweep."""
     myflags = reading_utils.flags_to_dict(flags)
     with wandb.init() as run:

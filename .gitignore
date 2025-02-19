@@ -15,3 +15,5 @@ datasets
 models
 
 wandb
+
+rollouts
