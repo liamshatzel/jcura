@@ -522,9 +522,10 @@ def train(rank, flags, world_size, device):
               valid_loss = validation(
                 simulator, sampled_valid_example, n_features, flags, rank, device_id)
               print(f"Validation loss at {step}: {valid_loss.item()}")
+              wandb.log({"Validation Loss: ": valid_loss.item()})
 
         # Visualization
-        if flags["visualization_interval"] is not None:
+        if flags["visualization_interval"] is not None and not flags["wandb_sweep"]:
           if step > 0 and step % flags["visualization_interval"] == 0:
             simulator.eval()
             video_path = os.path.join(flags["output_path"], f"rollout_{step}.mp4")
@@ -673,7 +674,7 @@ def _get_simulator(
       latent_dim=128,
       nmessage_passing_steps=10,
       nmlp_layers=2,
-      mlp_hidden_dim=128,
+      mlp_hidden_dim=wandb.config.hidden_dim,
       connectivity_radius=metadata['default_connectivity_radius'],
       boundaries=np.array(metadata['bounds']),
       normalization_stats=normalization_stats,
@@ -736,6 +737,19 @@ def main(_):
     if FLAGS.wandb_enable:
       wandb.login()
 
+      sweep_configuration = {
+          "method": "random",
+          "metric": {"goal": "minimize", "name": "train_loss"},
+          "parameters": {
+              "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
+              "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
+              "ntraining_steps": {"max": 10000, "min": 1000},
+              "hidden_dim": {"values": [32, 64, 128, 256]}
+          },
+      }
+
+      sweep_id = wandb.sweep(sweep=sweep_configuration, project="jcura", entity="GAIDG_Lab")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device == torch.device("cuda"):
         os.environ["MASTER_ADDR"] = "localhost"
@@ -797,24 +811,13 @@ def main(_):
 
 def train_sweep(flags):
 
-    sweep_configuration = {
-        "method": "random",
-        "metric": {"goal": "minimize", "name": "train_loss"},
-        "parameters": {
-            "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
-            "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
-            'ntraining_steps': {"max": 50, "min": 200}
-        },
-    }
-
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project="jcura", entity="GAIDG_Lab")
     """Train function for wandb sweep."""
     myflags = reading_utils.flags_to_dict(flags)
     with wandb.init() as run:
 
         # Update flags with wandb config
         myflags["batch_size"] = wandb.config.batch_size
-        myflags["lr_init"] = wandb.config.lr_init
+        # myflags["lr_init"] = wandb.config.lr_init
         myflags["ntraining_steps"] = wandb.config.ntraining_steps
         
         train(None, myflags, world_size=1, device=torch.device("cpu"))  
