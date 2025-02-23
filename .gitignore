@@ -17,3 +17,5 @@ models
 wandb
 
 rollouts
+
+*.out
