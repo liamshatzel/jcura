@@ -742,8 +742,8 @@ def main(_):
           "metric": {"goal": "minimize", "name": "train_loss"},
           "parameters": {
               "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
-              "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
-              "ntraining_steps": {"max": 10000, "min": 1000},
+              # "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
+              "ntraining_steps": {"min": 100, "max": 1000},
               "hidden_dim": {"values": [32, 64, 128, 256]}
           },
       }
