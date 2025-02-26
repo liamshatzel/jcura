@@ -822,8 +822,9 @@ def train_sweep(flags):
         #myflags["batch_size"] = wandb.config.batch_size
         #myflags["lr_init"] = wandb.config.lr_init
         myflags["ntraining_steps"] = wandb.config.ntraining_steps
-        
-        train(None, myflags, world_size=1, device=torch.device("cpu"))  
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        train(None, myflags, world_size=1, device=device)  
 
 if __name__ == "__main__":
     app.run(main)
