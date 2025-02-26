@@ -672,10 +672,10 @@ def _get_simulator(
       nnode_in=nnode_in,
       nedge_in=nedge_in,
       latent_dim=128,
-      nmessage_passing_steps=10,
+      nmessage_passing_steps=wandb.config.mps,
       nmlp_layers=2,
       mlp_hidden_dim=wandb.config.hidden_dim,
-      connectivity_radius=metadata['default_connectivity_radius'],
+      connectivity_radius=wandb.config.conn_radius
       boundaries=np.array(metadata['bounds']),
       normalization_stats=normalization_stats,
       nparticle_types=NUM_PARTICLE_TYPES,
@@ -741,10 +741,12 @@ def main(_):
           "method": "random",
           "metric": {"goal": "minimize", "name": "train_loss"},
           "parameters": {
-              "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
-              # "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
-              "ntraining_steps": {"min": 100, "max": 1000},
-              "hidden_dim": {"values": [32, 64, 128, 256]}
+              #"batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
+              #"lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
+              #"ntraining_steps": {"min": 100, "max": 1000},
+              #"hidden_dim": {"values": [32, 64, 128, 256]},
+              "mps": {"min": 0, "max": 15}
+              "conn_rad": {"min": 0.003, "max": 0.03}
           },
       }
 
@@ -816,9 +818,9 @@ def train_sweep(flags):
     with wandb.init() as run:
 
         # Update flags with wandb config
-        myflags["batch_size"] = wandb.config.batch_size
-        # myflags["lr_init"] = wandb.config.lr_init
-        myflags["ntraining_steps"] = wandb.config.ntraining_steps
+        #myflags["batch_size"] = wandb.config.batch_size
+        #myflags["lr_init"] = wandb.config.lr_init
+        #myflags["ntraining_steps"] = wandb.config.ntraining_steps
         
         train(None, myflags, world_size=1, device=torch.device("cpu"))  
 
