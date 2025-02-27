@@ -369,7 +369,7 @@ def train(rank, flags, world_size, device):
     device: torch device type
   """
   if device == torch.device("cuda"):
-    distribute.setup(rank, world_size, device)
+    #distribute.setup(rank, world_size, device)
     device_id = rank
   else:
     device_id = device
@@ -445,9 +445,10 @@ def train(rank, flags, world_size, device):
 
   # Get data loader
   get_data_loader = (
-    distribute.get_data_distributed_dataloader_by_samples
-    if device == torch.device("cuda")
-    else data_loader.get_data_loader_by_samples
+    #distribute.get_data_distributed_dataloader_by_samples
+    #if device == torch.device("cuda")
+    #else 
+    data_loader.get_data_loader_by_samples
   )
 
   # Load training data
@@ -479,7 +480,7 @@ def train(rank, flags, world_size, device):
   try:
     while step < flags["ntraining_steps"]:
       if device == torch.device("cuda"):
-        torch.distributed.barrier()
+        # torch.distributed.barrier()
 
       for example in dl:  
         steps_per_epoch += 1
@@ -583,7 +584,7 @@ def train(rank, flags, world_size, device):
       epoch_train_loss /= steps_per_epoch
       epoch_train_loss = torch.tensor([epoch_train_loss]).to(device_id)
       if device == torch.device("cuda"):
-        torch.distributed.reduce(epoch_train_loss, dst=0, op=torch.distributed.ReduceOp.SUM)
+        # torch.distributed.reduce(epoch_train_loss, dst=0, op=torch.distributed.ReduceOp.SUM)
         epoch_train_loss /= world_size
 
       train_loss_hist.append((epoch, epoch_train_loss.item()))
@@ -594,7 +595,7 @@ def train(rank, flags, world_size, device):
         epoch_valid_loss = validation(
                 simulator, sampled_valid_example, n_features, flags, rank, device_id)
         if device == torch.device("cuda"):
-          torch.distributed.reduce(epoch_valid_loss, dst=0, op=torch.distributed.ReduceOp.SUM)
+          # torch.distributed.reduce(epoch_valid_loss, dst=0, op=torch.distributed.ReduceOp.SUM)
           epoch_valid_loss /= world_size
 
         valid_loss_hist.append((epoch, epoch_valid_loss.item()))
@@ -624,8 +625,8 @@ def train(rank, flags, world_size, device):
   # Save model state on keyboard interrupt
   save_model_and_train_state(rank, device, simulator, flags, step, epoch, optimizer, train_loss, valid_loss, train_loss_hist, valid_loss_hist)
 
-  if torch.cuda.is_available():
-    distribute.cleanup()
+  # if torch.cuda.is_available():
+  #   distribute.cleanup()
 
 
 def _get_simulator(
@@ -674,8 +675,7 @@ def _get_simulator(
       latent_dim=128,
       nmessage_passing_steps=wandb.config.mps,
       nmlp_layers=2,
-      mlp_hidden_dim=128,
-      #wandb.config.hidden_dim,
+      mlp_hidden_dim=wandb.config.hidden_dim,
       connectivity_radius=wandb.config.conn_radius,
       boundaries=np.array(metadata['bounds']),
       normalization_stats=normalization_stats,
@@ -761,7 +761,7 @@ def main(_):
     myflags = reading_utils.flags_to_dict(FLAGS)
 
     if FLAGS.wandb_sweep and FLAGS.mode == "train":
-        wandb.agent(sweep_id, function=lambda: train_sweep(FLAGS), count=100000)
+        wandb.agent(sweep_id, function=lambda: train_sweep(FLAGS), count=10000)
         return
     elif FLAGS.wandb_enable:
         wandb.init(
@@ -794,7 +794,9 @@ def main(_):
             print(f"Using {world_size}/{available_gpus} GPUs")
 
             # Spawn training to GPUs
-            distribute.spawn_train(train, myflags, world_size, device)
+            # distribute.spawn_train(train, myflags, world_size, device)
+
+            train(rank, myflags, world_size, device)
 
         # Train on cpu
         else:
@@ -822,7 +824,7 @@ def train_sweep(flags):
         #myflags["batch_size"] = wandb.config.batch_size
         #myflags["lr_init"] = wandb.config.lr_init
         myflags["ntraining_steps"] = wandb.config.ntraining_steps
-
+        
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         train(None, myflags, world_size=1, device=device)  
 
