@@ -673,11 +673,13 @@ def _get_simulator(
       nnode_in=nnode_in,
       nedge_in=nedge_in,
       latent_dim=128,
-      nmessage_passing_steps=wandb.config.mps,
+      nmessage_passing_steps=12,
+      #wandb.config.mps,
       nmlp_layers=2,
       mlp_hidden_dim=128,
       #wandb.config.hidden_dim,
-      connectivity_radius=wandb.config.conn_radius,
+      connectivity_radius=metadata["default_connectivity_radius"],
+      # wandb.config.conn_radius,
       boundaries=np.array(metadata['bounds']),
       normalization_stats=normalization_stats,
       nparticle_types=NUM_PARTICLE_TYPES,
@@ -824,7 +826,8 @@ def train_sweep(flags):
         # Update flags with wandb config
         #myflags["batch_size"] = wandb.config.batch_size
         #myflags["lr_init"] = wandb.config.lr_init
-        myflags["ntraining_steps"] = wandb.config.ntraining_steps
+        myflags["ntraining_steps"] = 300
+        #wandb.config.ntraining_steps
         
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if not myflags["force_cpu"]:
