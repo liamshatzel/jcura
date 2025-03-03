@@ -33,7 +33,8 @@ def main():
     run_name = dataset_name + f"_{time.strftime('%Y-%m-%d_%H:%M:%S')}"
     config = vars(args)
     wandb.init(
-        project="224w-gns",
+        project="jcura",
+        entity="GAIDG_Lab",
         name=run_name,
         tags=[dataset_name, "train"],
         config=config,
