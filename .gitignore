@@ -10,7 +10,7 @@ env
 
 *.DS_Store
 
-# datasets
+datasets
 !datasets/WaterDropSample
 models
 
