@@ -1,0 +1,34 @@
+{
+  "0": {
+    "particle_type": {
+      "offset": 0,
+      "shape": [
+        678
+      ]
+    },
+    "position": {
+      "offset": 0,
+      "shape": [
+        1001,
+        678,
+        2
+      ]
+    }
+  },
+  "1": {
+    "particle_type": {
+      "offset": 678,
+      "shape": [
+        355
+      ]
+    },
+    "position": {
+      "offset": 1357356,
+      "shape": [
+        1001,
+        355,
+        2
+      ]
+    }
+  }
+}
