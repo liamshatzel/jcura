@@ -1,0 +1,5 @@
+__pycache__/
+output/*
+wandb/
+scripts/slurm/*.o*
+scripts/slurm/*.e*
