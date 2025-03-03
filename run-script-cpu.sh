@@ -3,7 +3,7 @@
 #SBATCH --mem=32G
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
-#SBATCH --time=5:0:0
+#SBATCH --time=15:0:0
 #SBATCH --mail-user=lshatzel@uvic.ca
 #SBATCH --mail-type=ALL
 module purge

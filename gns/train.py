@@ -26,6 +26,9 @@ from matplotlib import animation
 
 import wandb
 
+os.environ["MASTER_ADDR"] = "localhost"
+os.environ["MASTER_PORT"] = "29500"
+
 TYPE_TO_COLOR = {
     3: "black",
     0: "green",
@@ -673,13 +676,14 @@ def _get_simulator(
       nnode_in=nnode_in,
       nedge_in=nedge_in,
       latent_dim=128,
+      # TODO: Fix to use flags
       nmessage_passing_steps=12,
-      #wandb.config.mps,
+      # wandb.config.mps,
       nmlp_layers=2,
       mlp_hidden_dim=128,
       #wandb.config.hidden_dim,
       connectivity_radius=metadata["default_connectivity_radius"],
-      # wandb.config.conn_radius,
+      #wandb.config.conn_radius,
       boundaries=np.array(metadata['bounds']),
       normalization_stats=normalization_stats,
       nparticle_types=NUM_PARTICLE_TYPES,
@@ -745,10 +749,10 @@ def main(_):
           "method": "random",
           "metric": {"goal": "minimize", "name": "train_loss"},
           "parameters": {
-              #"batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
-              #"lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
+              "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
+              "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
               "ntraining_steps": {"min": 500, "max": 1000},
-              #"hidden_dim": {"values": [32, 64, 128, 256]},
+              "hidden_dim": {"values": [32, 64, 128, 256]},
               "mps": {"min": 1, "max": 15},
               "conn_radius": {"min": 0.003, "max": 0.03}
           },
@@ -768,7 +772,7 @@ def main(_):
         return
     elif FLAGS.wandb_enable:
         wandb.init(
-            project="crowd-manifold",
+            project="jcura",
             entity="GAIDG_Lab",
             config=FLAGS,
         )   
@@ -777,6 +781,8 @@ def main(_):
         # If model_path does not exist create new directory.
         if not os.path.exists(FLAGS.model_path):
             os.makedirs(FLAGS.model_path)
+
+        print(device)
 
         # Train on gpu
         if device == torch.device("cuda"):
@@ -795,11 +801,11 @@ def main(_):
 
             # Print the status of GPU usage
             print(f"Using {world_size}/{available_gpus} GPUs")
-
+            print(torch.cuda.get_device_name(0))
             # Spawn training to GPUs
             distribute.spawn_train(train, myflags, world_size, device)
 
-            train(rank, myflags, world_size, device)
+            # train(rank, myflags, world_size, device)
 
         # Train on cpu
         else:
@@ -824,10 +830,9 @@ def train_sweep(flags):
     with wandb.init() as run:
 
         # Update flags with wandb config
-        #myflags["batch_size"] = wandb.config.batch_size
-        #myflags["lr_init"] = wandb.config.lr_init
-        myflags["ntraining_steps"] = 300
-        #wandb.config.ntraining_steps
+        myflags["batch_size"] = wandb.config.batch_size
+        myflags["lr_init"] = wandb.config.lr_init
+        myflags["ntraining_steps"] = wandb.config.ntraining_steps
         
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if not myflags["force_cpu"]:
