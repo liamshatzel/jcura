@@ -16,7 +16,7 @@
     9.33413382864967e-5
   ],
   "dim": 2,
-  "default_connectivity_radius": 0.02,
+  "default_connectivity_radius": 0.015,
   "bounds": [
     [
       0.1,
