@@ -3,3 +3,6 @@ output/*
 wandb/
 scripts/slurm/*.o*
 scripts/slurm/*.e*
+*.pt
+*.mp4
+datasets
