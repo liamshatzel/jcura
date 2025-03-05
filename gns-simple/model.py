@@ -62,7 +62,7 @@ class LearnedSimulator(torch.nn.Module):
     def __init__(
         self,
         hidden_size=128,
-        n_mp_layers=10,
+        n_mp_layers=12,
         num_particle_types=NUM_PARTICLE_TYPES,
         particle_type_dim=16,
         dim=2,

@@ -24,22 +24,46 @@ def main():
     parser.add_argument("--eval-interval", type=int, default=100000)
     parser.add_argument("--vis-interval", type=int, default=100000)
     parser.add_argument("--save-interval", type=int, default=100000)
+    parser.add_argument("--hidden-dim", type=int, default=128)
     parser.add_argument("--output-path", required=True)
+    parser.add_argument("--wandb-sweep", type=bool, default=False)
+
     args = parser.parse_args()
 
     os.makedirs(args.output_path, exist_ok=True)
-
+    if torch.cuda.is_available():
+        print("Using GPU: " + torch.cuda.get_device_name(0))
     dataset_name = args.data_path.split("/")[-1]
     run_name = dataset_name + f"_{time.strftime('%Y-%m-%d_%H:%M:%S')}"
     config = vars(args)
-    wandb.init(
-        project="jcura",
-        entity="GAIDG_Lab",
-        name=run_name,
-        tags=[dataset_name, "train"],
-        config=config,
-    )
-    assert wandb.run is not None
+
+    if args.wandb_sweep: 
+        sweep_configuration = {
+              "method": "random",
+              "metric": {"goal": "minimize", "name": "train_loss"},
+              "parameters": {
+                  "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
+                #   "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
+                #   "ntraining_steps": {"min": 500, "max": 1000},
+                  "hidden_dim": {"values": [32, 64, 128, 256]},
+                #   "mps": {"min": 1, "max": 15},
+                #   "conn_radius": {"min": 0.003, "max": 0.03}
+              },
+          }
+        sweep_id = wandb.sweep(sweep=sweep_configuration, project="jcura", entity="GAIDG_Lab")
+        wandb.init()
+
+
+        args.batch_size = wandb.config.batch_size 
+    else: 
+        wandb.init(
+            project="jcura",
+            entity="GAIDG_Lab",
+            name=run_name,
+            tags=[dataset_name, "train"],
+            config=config,
+        )
+        assert wandb.run is not None
 
     train_dataset = dataset.OneStepDataset(
         args.data_path, "train", noise_std=args.noise
@@ -123,7 +147,7 @@ def main():
                 wandb.log({"eval_loss": eval_loss})
                 simulator.train()
 
-            if args.vis_interval and total_batch % args.vis_interval == 0:
+            if args.vis_interval and total_batch % args.vis_interval == 0 and not args.wandb_sweep:
                 simulator.eval()
                 rollout_data = rollout_dataset[0]
                 rollout_out = rollout.rollout(
