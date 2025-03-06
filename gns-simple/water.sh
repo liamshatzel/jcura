@@ -3,7 +3,7 @@
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:p100:1
 #SBATCH --ntasks-per-node=8
-#SBATCH --time=10:0:0
+#SBATCH --time=15:0:0
 #SBATCH --mail-user=lshatzel@uvic.ca
 #SBATCH --mail-type=ALL
 
@@ -27,6 +27,6 @@ source venv/bin/activate
 #     --vis-interval 1000 \
 #     --save-interval 1000
 
-python train.py --data-path datasets/WaterDropSample --output datasets/WaterDropSample --epoch 300 --eval-interval 1000 --vis-interval 100000 --save-interval 4000
+python train.py --data-path datasets/WaterDropSample --output datasets/WaterDropSample --epoch 1000 --eval-interval 1000 --vis-interval 1000 --save-interval 4000 
     # ${SCRATCH}/224w-gns/datasets/${dataset} \
     # ${SCRATCH}/224w-gns/datasets/${dataset} \

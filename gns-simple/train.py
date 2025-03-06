@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-path", required=True)
     parser.add_argument("--epoch", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=2)
+    parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--num-workers", type=int, default=2)
     parser.add_argument("--noise", type=float, default=3e-4)
@@ -36,25 +36,30 @@ def main():
     dataset_name = args.data_path.split("/")[-1]
     run_name = dataset_name + f"_{time.strftime('%Y-%m-%d_%H:%M:%S')}"
     config = vars(args)
+    wandb.login()
 
     if args.wandb_sweep: 
         sweep_configuration = {
               "method": "random",
               "metric": {"goal": "minimize", "name": "train_loss"},
               "parameters": {
-                  "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
+                #   "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  
                 #   "lr_init": {"values": [1e-3, 1e-4, 1e-5]},  
                 #   "ntraining_steps": {"min": 500, "max": 1000},
-                  "hidden_dim": {"values": [32, 64, 128, 256]},
+                  "hidden_dim": {"values": [16, 32, 64, 128, 256]},
                 #   "mps": {"min": 1, "max": 15},
                 #   "conn_radius": {"min": 0.003, "max": 0.03}
               },
           }
+
+        args.hidden_dim = wandb.config.hidden_dim
         sweep_id = wandb.sweep(sweep=sweep_configuration, project="jcura", entity="GAIDG_Lab")
-        wandb.init()
+        with wandb.init() as run:
+            wandb.agent(sweep_id, function=lambda: train(args), count=10000)
+        # wandb.init()
 
 
-        args.batch_size = wandb.config.batch_size 
+        # args.batch_size = wandb.config.batch_size 
     else: 
         wandb.init(
             project="jcura",
@@ -64,7 +69,9 @@ def main():
             config=config,
         )
         assert wandb.run is not None
+        train(args)
 
+def train(args):
     train_dataset = dataset.OneStepDataset(
         args.data_path, "train", noise_std=args.noise
     )
@@ -87,7 +94,7 @@ def main():
     )
     rollout_dataset = dataset.RolloutDataset(args.data_path, "valid")
 
-    simulator = model.LearnedSimulator()
+    simulator = model.LearnedSimulator(hidden_size=args.hidden_dim)
     if torch.cuda.is_available():
         simulator = simulator.cuda()
 
@@ -198,8 +205,45 @@ def main():
                 artifact.add_file(checkpt_path)
                 wandb.log_artifact(artifact)
 
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                save_model_and_train_state(None, device, simulator, args, total_batch, epoch, 
+                optimizer, loss, eval_loss, None, None)
+
     wandb.finish()
 
+def save_model_and_train_state(rank, device, simulator, flags, step, epoch, optimizer,
+                                train_loss, valid_loss, train_loss_hist, valid_loss_hist):
+  """Save model state
+  
+  Args:
+    rank: local rank
+    device: torch device type
+    simulator: Trained simulator if not will undergo training.
+    flags: flags
+    step: step
+    epoch: epoch
+    optimizer: optimizer
+    train_loss: training loss at current step
+    valid_loss: validation loss at current step
+    train_loss_hist: training loss history at each epoch
+    valid_loss_hist: validation loss history at each epoch
+  """
+  if rank == 0 or device == torch.device("cpu"):
+      if device == torch.device("cpu"):
+          simulator.save(flags["model_path"] + 'model-' + str(step) + '.pt')
+      else:
+          simulator.module.save(flags["model_path"] + 'model-' + str(step) + '.pt')
+
+    #   train_state = dict(optimizer_state=optimizer.state_dict(),
+    #                       global_train_state={
+    #                         "step": step, 
+    #                         "epoch": epoch,
+    #                         "train_loss": train_loss,
+    #                         "valid_loss": valid_loss
+    #                         },
+    #                       loss_history={"train": train_loss_hist, "valid": valid_loss_hist}
+    #                       )
+    #   torch.save(train_state, f'{flags["model_path"]}train_state-{step}.pt')
 
 if __name__ == "__main__":
     main()
