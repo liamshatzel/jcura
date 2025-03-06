@@ -1,0 +1,50 @@
+{
+  "0": {
+    "particle_type": {
+      "offset": 0,
+      "shape": [
+        909
+      ]
+    },
+    "position": {
+      "offset": 0,
+      "shape": [
+        1000,
+        909,
+        2
+      ]
+    }
+  },
+  "1": {
+    "particle_type": {
+      "offset": 909,
+      "shape": [
+        928
+      ]
+    },
+    "position": {
+      "offset": 1818000,
+      "shape": [
+        1000,
+        928,
+        2
+      ]
+    }
+  },
+  "2": {
+    "particle_type": {
+      "offset": 1837,
+      "shape": [
+        207
+      ]
+    },
+    "position": {
+      "offset": 3674000,
+      "shape": [
+        1000,
+        207,
+        2
+      ]
+    }
+  }
+}
