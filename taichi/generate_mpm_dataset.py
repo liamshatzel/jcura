@@ -9,13 +9,13 @@ import taichi as ti
 import numpy as np
 from tqdm import tqdm
 
-ti.init(arch=ti.gpu)
+ti.init(arch=ti.cpu)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_train", type=int, default=1000)
 parser.add_argument("--n_valid", type=int, default=30)
 parser.add_argument("--n_test", type=int, default=30)
-parser.add_argument("--n_steps", type=int, default=1000)
+parser.add_argument("--n_steps", type=int, default=1001)
 parser.add_argument("--n_substeps", type=int, default=50)
 parser.add_argument("--datapath", type=str, default="datasets/mpm88")
 
@@ -40,6 +40,7 @@ for i, n_particles in enumerate(all_n_particles):
     for s in tqdm(range(args.n_steps)):
         for substep in range(args.n_substeps):
             mpm.substep()
+        # TODO: Fix because only works for 1001 case and water
         all_simulations[i][s] = mpm.x.to_numpy()
 
 os.makedirs(args.datapath, exist_ok=True)
@@ -55,3 +56,5 @@ for split, n in [
     )
 
 print("Done!")
+
+

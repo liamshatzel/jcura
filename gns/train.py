@@ -37,6 +37,8 @@ TYPE_TO_COLOR = {
     5: "blue",
 }
 
+# python3 -m gns.train --data_path="datasets/mpm88/" --ntraining_steps=1000 --wandb_sweep=False --wandb_enable=False --mode=valid model_file=checkpoint_212000.pt
+
 flags.DEFINE_enum(
     'mode', 'train', ['train', 'valid', 'rollout'],
     help='Train model, validation or rollout evaluation.')
@@ -61,7 +63,7 @@ flags.DEFINE_integer('lr_decay_steps', int(5e6), help='Learning rate decay steps
 flags.DEFINE_integer("cuda_device_number", None, help="CUDA device (zero indexed), default is None so default CUDA device will be used.")
 flags.DEFINE_integer("n_gpus", 1, help="The number of GPUs to utilize for training.")
 flags.DEFINE_bool("wandb_sweep", False, help="Run a weights and biases hyperparam sweep.")
-flags.DEFINE_integer("visualization_interval", 1000, help="Visualize a rollout.")
+flags.DEFINE_integer("visualization_interval", None, help="Visualize a rollout.")
 flags.DEFINE_bool("wandb_enable", False, help="Enable weights and biases.")
 flags.DEFINE_bool("force_cpu", False, help="Make script use cpu only.")
 
@@ -201,7 +203,8 @@ def rollout(
   predictions = torch.stack(predictions)
   ground_truth_positions = ground_truth_positions.permute(1, 0, 2)
 
-  loss = (predictions - ground_truth_positions) ** 2
+  loss = 0 
+  #(predictions - ground_truth_positions) ** 2
 
   output_dict = {
       'initial_positions': initial_positions.permute(1, 0, 2).cpu().numpy(),

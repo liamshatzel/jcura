@@ -19,3 +19,5 @@ wandb
 rollouts
 
 *.out
+
+datasets
