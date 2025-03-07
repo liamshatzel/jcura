@@ -746,7 +746,7 @@ def main(_):
       wandb.login()
 
       sweep_configuration = {
-          "method": "random",
+          "method": "bayes",
           "metric": {"goal": "minimize", "name": "train_loss"},
           "parameters": {
               # "batch_size": {"values": [2, 4, 8, 16, 32, 64]},  

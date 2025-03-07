@@ -94,7 +94,7 @@ def train(args):
     )
     rollout_dataset = dataset.RolloutDataset(args.data_path, "valid")
 
-    simulator = model.LearnedSimulator(hidden_size=args.hidden_dim)
+    simulator = model.LearnedSimulator(hidden_size=hidden_dim)
     if torch.cuda.is_available():
         simulator = simulator.cuda()
 
@@ -157,9 +157,13 @@ def train(args):
             if args.vis_interval and total_batch % args.vis_interval == 0 and not args.wandb_sweep:
                 simulator.eval()
                 rollout_data = rollout_dataset[0]
+                start = time.time()
                 rollout_out = rollout.rollout(
                     simulator, rollout_data, rollout_dataset.metadata, args.noise
                 )
+                end = time.time()
+                rollout_time = end - start
+                wandb.log({"rollout_time": rollout_time})
                 rollout_out = rollout_out.permute(1, 0, 2)
                 anim = visualize.visualize_pair(
                     rollout_data["particle_type"],
@@ -206,33 +210,27 @@ def train(args):
                 wandb.log_artifact(artifact)
 
                 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-                save_model_and_train_state(None, device, simulator, args, total_batch, epoch, 
-                optimizer, loss, eval_loss, None, None)
+                # save_model_and_train_state(None, device, simulator, args, total_batch, epoch, 
+                # optimizer, loss, eval_loss, None, None)
 
     wandb.finish()
 
-def save_model_and_train_state(rank, device, simulator, flags, step, epoch, optimizer,
-                                train_loss, valid_loss, train_loss_hist, valid_loss_hist):
-  """Save model state
-  
-  Args:
-    rank: local rank
-    device: torch device type
-    simulator: Trained simulator if not will undergo training.
-    flags: flags
-    step: step
-    epoch: epoch
-    optimizer: optimizer
-    train_loss: training loss at current step
-    valid_loss: validation loss at current step
-    train_loss_hist: training loss history at each epoch
-    valid_loss_hist: validation loss history at each epoch
-  """
-  if rank == 0 or device == torch.device("cpu"):
-      if device == torch.device("cpu"):
-          simulator.save(flags["model_path"] + 'model-' + str(step) + '.pt')
-      else:
-          simulator.module.save(flags["model_path"] + 'model-' + str(step) + '.pt')
+
+def save_model_and_train_state(rank, device, simulator, flags, step, epoch, optimizer, train_loss, valid_loss, train_loss_hist, valid_loss_hist):
+    if rank == 0 or device == torch.device("cpu"):
+        model_path = os.path.join(
+        flags.output_path, f"model_{step}.pt"
+        )
+        if device == torch.device("cpu"):
+            simulator.save(flags.output_path + 'model_' + str(step) + '.pt')
+        else:
+            simulator.module.save(flags.output_path + 'model_' + str(step) + '.pt')
+
+        artifact = wandb.Artifact(
+            f"model_{step}", type="model")
+        artifact.add_file(model_path)
+        wandb.log_artifact(artifact)
+
 
     #   train_state = dict(optimizer_state=optimizer.state_dict(),
     #                       global_train_state={
