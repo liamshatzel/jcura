@@ -13,7 +13,6 @@ def main():
     args = parser.parse_args()
 
     ds = np.load(os.path.join(args.datapath, f"positions_train.npz"))
-
     positions = []
     for f in ds:
         positions.append(ds[f])
