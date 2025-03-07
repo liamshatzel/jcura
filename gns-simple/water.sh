@@ -27,6 +27,6 @@ source venv/bin/activate
 #     --vis-interval 1000 \
 #     --save-interval 1000
 
-python train.py --data-path datasets/WaterDropSample --output datasets/WaterDropSample --epoch 1000 --eval-interval 1000 --vis-interval 1000 --save-interval 4000 
+python train.py --data-path datasets/WaterDropSample --output datasets/WaterDropSample --epoch 1000 --eval-interval 1000 --vis-interval 100000 --save-interval 1000 --hidden_dim 32
     # ${SCRATCH}/224w-gns/datasets/${dataset} \
     # ${SCRATCH}/224w-gns/datasets/${dataset} \
