@@ -2,6 +2,7 @@ import torch
 
 import dataset
 import model
+import time
 
 
 def rollout(model, data, metadata, noise_std):
@@ -15,9 +16,13 @@ def rollout(model, data, metadata, noise_std):
 
     for time in range(total_time - window_size):
         with torch.no_grad():
+            start = time.time()
             graph = dataset.preprocess(
                 particle_type, traj[:, -window_size:], None, metadata, 0.0
             )
+            end = time.time()
+            graph_time = end - start
+            wandb.log({"graph_time", graph_time})
             graph = graph.to(device)
             acceleration = model(graph).cpu()
             acceleration = acceleration * torch.sqrt(
